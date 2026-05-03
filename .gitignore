@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+outputs/charts/*
+outputs/reports/*
+!outputs/.gitkeep
+.env
+*.egg-info/
+dist/
+build/

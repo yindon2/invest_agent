@@ -2,11 +2,13 @@
 投资学AI Agent - 主程序入口
 ==========================
 功能：整合所有分析技能，提供统一的调用接口
-支持：个股基本面分析、宏观经济分析、可视化输出、交叉验证
+支持：个股基本面分析、宏观经济分析、可视化输出、交叉验证、风险人格选股
 
 使用方法:
     python agent.py fundamental <股票代码>          # 个股基本面分析
     python agent.py macro --indicator CPI --index 上证指数  # 宏观经济分析
+    python agent.py recommend F2-E2-C2-T2           # 根据IRTI风险人格推荐
+    python agent.py claude                          # Claude Code启动方式
     python agent.py demo                            # 运行演示
 """
 
@@ -236,7 +238,242 @@ class InvestmentAgent:
         print("=" * 60)
 
 
-def demo():
+def show_claude_startup():
+    """显示Claude Code启动方式"""
+    print("""
+╔══════════════════════════════════════════════════════════════╗
+║                🐧 企鹅奇才 · Claude Code 启动方式            ║
+╚══════════════════════════════════════════════════════════════╝
+
+方式一：在 Claude Code 中直接运行分析命令
+—————————————————————————————————————————————
+  claude "分析贵州茅台 600519 的基本面"
+  claude "CPI与上证指数的关联性如何？"
+  claude "帮我写一份完整的投资分析报告"
+
+方式二：作为 Claude Code Agent 技能加载
+—————————————————————————————————————————————
+  在 CLAUDE.md 中添加本 Agent 路径，然后：
+  claude "运行 invest-agent fundamental 600519"
+
+方式三：本地 Python 直接运行
+—————————————————————————————————————————————
+  python agent.py demo                         # 运行完整演示
+  python agent.py fundamental 600519           # 个股基本面分析
+  python agent.py macro -i CPI -n 上证指数     # 宏观经济分析
+  python agent.py recommend F2-E2-C2-T2        # 风险人格推荐
+
+方式四：作为 pip 包安装后使用
+—————————————————————————————————————————————
+  pip install invest-agent                     # 安装
+  invest-agent fundamental 600519              # 命令行使用
+
+📖 详细文档：https://github.com/yindon2/invest_agent
+""")
+
+
+# ========== IRTI 风险人格类型 → 股票推荐 ==========
+# 免责声明：以下推荐仅供参考与教学研究，不构成任何投资建议。
+# 股市有风险，投资需谨慎。所有投资决策风险由投资者自行承担。
+
+IRTI_STOCK_MAP = {
+    '保守型': {
+        'label': '保守型投资者',
+        'desc': '风险承受能力较低，适合稳定收益型标的',
+        'stocks': [
+            {'code': '601398', 'name': '工商银行', 'reason': '国有大行，分红稳定，股价波动小，适合保守型长期持有'},
+            {'code': '600900', 'name': '长江电力', 'reason': '水电龙头，现金流充沛，防御性强，股息率稳定'},
+            {'code': '600519', 'name': '贵州茅台', 'reason': '高端消费龙头，品牌护城河极深，长期稳健增长'},
+        ]
+    },
+    '稳健型': {
+        'label': '稳健型投资者',
+        'desc': '风险承受能力中等，适合均衡配置',
+        'stocks': [
+            {'code': '600036', 'name': '招商银行', 'reason': '零售银行标杆，风控优秀，兼具成长与分红'},
+            {'code': '000333', 'name': '美的集团', 'reason': '家电龙头，全球化布局，业务多元化抗风险能力强'},
+            {'code': '600887', 'name': '伊利股份', 'reason': '乳业龙头，消费刚需，业绩稳健增长'},
+        ]
+    },
+    '进取型': {
+        'label': '进取型投资者',
+        'desc': '风险承受能力较高，适合成长性标的',
+        'stocks': [
+            {'code': '300750', 'name': '宁德时代', 'reason': '动力电池全球龙头，新能源赛道高成长'},
+            {'code': '300760', 'name': '迈瑞医疗', 'reason': '医疗器械龙头，国产替代空间大，业绩持续高增'},
+            {'code': '688981', 'name': '中芯国际', 'reason': '晶圆代工龙头，半导体国产化核心标的'},
+        ]
+    }
+}
+
+
+def get_risk_level(risk_code: str) -> str:
+    """
+    解析IRTI风险人格代码，返回风险等级
+
+    参数:
+        risk_code: IRTI风险代码，格式如 "F2-E2-C2-T2"
+
+    返回:
+        '保守型' | '稳健型' | '进取型'
+    """
+    try:
+        risk_code = risk_code.strip().upper()
+        parts = risk_code.split('-')
+        if len(parts) != 4:
+            raise ValueError("格式错误")
+
+        scores = []
+        for p in parts:
+            if p[0] not in ('F', 'E', 'C', 'T'):
+                raise ValueError("维度错误")
+            scores.append(int(p[1]))
+
+        avg = sum(scores) / 4
+        if avg <= 2.0:
+            return '保守型'
+        elif avg <= 3.0:
+            return '稳健型'
+        else:
+            return '进取型'
+    except Exception:
+        return None
+
+
+def recommend_by_risk(risk_code: str):
+    """
+    根据IRTI风险人格类型推荐3只股票（仅供参考研究）
+
+    参数:
+        risk_code: IRTI风险代码，如 "F2-E2-C2-T2"
+
+    输出股票推荐（含免责声明）
+    """
+    from skills.fundamental import FundamentalAnalysisSkill
+    from datetime import datetime
+
+    print("\n" + "=" * 70)
+    print("     🐧 企鹅奇才 · IRTI风险人格选股参考")
+    print("     ⚠️  以下内容仅供教学研究参考，不构成投资建议")
+    print("=" * 70)
+
+    level = get_risk_level(risk_code)
+
+    if level is None:
+        print(f"\n❌ 风险代码格式错误: {risk_code}")
+        print("   正确格式示例: F2-E2-C2-T2")
+        print("   格式说明: F{1-4}-E{1-4}-C{1-4}-T{1-4}")
+        print("   例如: F3-E2-C3-T2 表示 财务强韧-情绪中庸-专业认知-战术资金")
+        return
+
+    profile = IRTI_STOCK_MAP[level]
+    dim_names = {
+        'F': ('财务承载力', ['脆弱', '稳健', '强韧', '极高']),
+        'E': ('情绪波动性', ['敏感', '中庸', '冷静', '冷漠']),
+        'C': ('认知复杂度', ['基础', '进阶', '专业', '构建']),
+        'T': ('流动性周期', ['超短钱', '战术钱', '战略钱', '永续钱'])
+    }
+
+    print(f"\n📋 输入的风险代码: {risk_code}")
+    print(f"📊 风险等级评估: {level} — {profile['label']}")
+    print(f"📝 特征描述: {profile['desc']}")
+
+    try:
+        parts = risk_code.split('-')
+        print(f"\n📐 四维分析:")
+        for i, p in enumerate(parts):
+            dim = p[0]
+            lv = int(p[1])
+            name, levels = dim_names[dim]
+            print(f"   {dim} ({name}): 第{lv}级 — {levels[lv-1]}")
+    except Exception:
+        pass
+
+    # ====== 核心推荐（带强免责声明）======
+    print(f"""
+
+{'╔' + '═'*68 + '╗'}
+{'║' + ' '*68 + '║'}
+{'║  ⚠️  重 要 免 责 声 明 ⚠️' + ' '*44 + '║'}
+{'║' + ' '*68 + '║'}
+{'║  以下推荐的3只股票仅基于IRTI风险人格类型的学术研究匹配。' + ' '*4 + '║'}
+{'║  ★ 不构成任何形式的购买建议或购买推荐 ★' + ' '*25 + '║'}
+{'║  ★ 不构成任何投资建议，仅供参考 ★' + ' '*32 + '║'}
+{'║  ★ 股市有风险，投资需谨慎 ★' + ' '*37 + '║'}
+{'║  ★ 所有投资决策风险由投资者自行承担 ★' + ' '*27 + '║'}
+{'║' + ' '*68 + '║'}
+{'╚' + '═'*68 + '╝'}
+
+{'─'*70}
+   📌 针对 {profile['label']} ({risk_code}) 的参考匹配标的
+{'─'*70}""")
+
+    for i, stock in enumerate(profile['stocks'], 1):
+        print(f"""
+  [{i}] {stock['name']} ({stock['code']})
+      ├ 匹配逻辑: {stock['reason']}
+      └ 详细分析: python agent.py fundamental {stock['code']}""")
+
+    print(f"""
+
+{'─'*70}
+  ⚠️ 再 次 提 醒
+
+  以上内容由AI Agent基于风险人格类型自动匹配生成，
+  仅供参考与学术研究使用。
+
+  📌 不构成任何投资建议或购买推荐
+  📌 过往表现不代表未来收益
+  📌 投资有风险，入市需谨慎
+  📌 请根据自身情况独立决策
+
+  建议使用本Agent的 fundamental 命令进行详细的个股
+  基本面分析（杜邦分析、财务健康评分等）后再做决策。
+
+  运行示例:
+    python agent.py fundamental {profile['stocks'][0]['code']}
+{'─'*70}
+
+  分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+""")
+
+
+# ========== Claude Code 集成启动方式 ==========
+
+
+def recommend_main():
+    """风险人格推荐命令行入口"""
+    parser = argparse.ArgumentParser(description='IRTI风险人格选股推荐')
+    parser.add_argument('risk_code', type=str, nargs='?',
+                       help='IRTI风险代码，格式如 F2-E2-C2-T2')
+    parser.add_argument('--list', '-l', action='store_true',
+                       help='列出所有风险等级对应的推荐标的')
+
+    args = parser.parse_args(sys.argv[2:])
+
+    if args.list:
+        print(f"\n{'='*60}")
+        print("     IRTI风险人格等级 · 所有推荐标的概览")
+        print(f"{'='*60}")
+        for level_key in ['保守型', '稳健型', '进取型']:
+            profile = IRTI_STOCK_MAP[level_key]
+            print(f"\n── {profile['label']} ── {profile['desc']}")
+            for s in profile['stocks']:
+                print(f"   {s['code']} {s['name']} — {s['reason']}")
+        print()
+        return
+
+    if not args.risk_code:
+        print("请提供IRTI风险代码，例如: python agent.py recommend F2-E2-C2-T2")
+        print("或者使用 --list 查看所有推荐标的")
+        return
+
+    recommend_by_risk(args.risk_code)
+
+
+def claude_main():
+    """Claude启动方式命令行入口"""
+    show_claude_startup()
     """运行演示"""
     print("\n" + "=" * 70)
     print("    投资学AI Agent 演示")
@@ -278,6 +515,9 @@ def main():
   python agent.py fundamental 000001 --save    # 分析平安银行并保存报告
   python agent.py macro -i CPI -n 上证指数     # CPI与上证指数关联分析
   python agent.py macro -i PPI -n 沪深300 -p 48  # PPI与沪深300(48个月)
+  python agent.py recommend F2-E2-C2-T2        # 根据IRTI风险人格推荐股票
+  python agent.py recommend --list             # 查看所有推荐标的
+  python agent.py claude                       # Claude Code启动方式
   python agent.py demo                         # 运行完整演示
         """
     )
@@ -300,6 +540,16 @@ def main():
     macro_parser.add_argument('--period', '-p', type=int, default=36,
                               help='分析周期(月)')
     macro_parser.add_argument('--save', '-s', action='store_true', help='保存报告')
+
+    # 风险人格选股命令
+    recommend_parser = subparsers.add_parser('recommend', help='根据IRTI风险人格推荐股票（仅供参考）')
+    recommend_parser.add_argument('risk_code', type=str, nargs='?',
+                                  help='IRTI风险代码，格式如 F2-E2-C2-T2')
+    recommend_parser.add_argument('--list', '-l', action='store_true',
+                                  help='列出所有推荐标的')
+
+    # Claude启动方式
+    subparsers.add_parser('claude', help='显示Claude Code启动方式')
 
     # 演示命令
     subparsers.add_parser('demo', help='运行演示')
@@ -328,6 +578,18 @@ def main():
         )
         if args.save:
             agent.macro.save_report()
+
+    elif args.command == 'recommend':
+        if args.list:
+            recommend_main()
+        elif args.risk_code:
+            recommend_by_risk(args.risk_code)
+        else:
+            print("请提供IRTI风险代码，例如: python agent.py recommend F2-E2-C2-T2")
+            print("或使用: python agent.py recommend --list 查看所有推荐标的")
+
+    elif args.command == 'claude':
+        show_claude_startup()
 
     elif args.command == 'demo':
         demo()

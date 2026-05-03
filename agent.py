@@ -91,6 +91,15 @@ class InvestmentAgent:
         report_path = self.fundamental.save_report()
         fundamental_result['报告路径'] = report_path
 
+        # 输出完整报告到控制台
+        print("\n" + "=" * 60)
+        print("完整分析报告")
+        print("=" * 60)
+        report_content = fundamental_result.get('分析报告', '')
+        if report_content:
+            print(report_content)
+        print("=" * 60)
+
         # 打印摘要
         self._print_summary(fundamental_result)
 

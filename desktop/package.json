@@ -1,0 +1,36 @@
+{
+  "name": "penguin-genius",
+  "productName": "企鹅奇才",
+  "version": "1.0.0",
+  "description": "AI 投资分析桌面客户端",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.penguin-genius.app",
+    "productName": "企鹅奇才",
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../",
+        "to": "app",
+        "filter": ["**/*", "!**/__pycache__", "!**/.git", "!**/outputs", "!config.json"]
+      }
+    ],
+    "win": {
+      "target": ["portable"],
+      "icon": "icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

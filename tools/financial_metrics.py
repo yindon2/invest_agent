@@ -243,7 +243,14 @@ class DupontAnalysis:
         equity_multiplier = total_assets / equity if equity > 0 else 0
 
         # 计算ROE
-        roe = net_margin * asset_turnover * equity_multiplier / 100
+        # 注: net_margin 已经是百分比 (如 38.25 表示 38.25%)
+        # ROE = 净利率(%) × 资产周转率 × 权益乘数 (= 净利率 * 100 转为小数后 × 周转率 × 乘数)
+        # 所以 roe = net_margin × turnover × multiplier / 100
+        # 但 net_margin 已经是百分比形式 (38.25), 所以:
+        #   净利率(小数) = net_margin / 100
+        #   ROE(%) = (net_margin/100) × turnover × multiplier × 100 = net_margin × turnover × multiplier
+        # 所以这里不需要再除以100
+        roe = net_margin * asset_turnover * equity_multiplier
 
         # 计算ROA
         roa = (net_income / total_assets) * 100 if total_assets > 0 else 0
@@ -254,7 +261,7 @@ class DupontAnalysis:
             '资产周转率': asset_turnover,                  # 总资产周转率
             '权益乘数': equity_multiplier,                 # 权益乘数
             'ROA': roa,                                    # 总资产收益率
-            '分解验证': net_margin * asset_turnover * equity_multiplier / 100  # 验证ROE
+            '分解验证': net_margin * asset_turnover * equity_multiplier  # 验证ROE
         }
 
     @staticmethod

@@ -8,3 +8,4 @@ outputs/reports/*
 *.egg-info/
 dist/
 build/
+config.json

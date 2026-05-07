@@ -513,6 +513,10 @@ def claude_main():
     return result, macro_result
 
 
+def demo():
+    """运行演示"""
+    claude_main()
+
 def main():
     """命令行主入口"""
     parser = argparse.ArgumentParser(
@@ -560,6 +564,9 @@ def main():
     # Claude启动方式
     subparsers.add_parser('claude', help='显示Claude Code启动方式')
 
+    # Web UI 交互模式
+    subparsers.add_parser('web', help='启动交互式Web UI (http://localhost:5000)')
+
     # 演示命令
     subparsers.add_parser('demo', help='运行演示')
 
@@ -602,6 +609,18 @@ def main():
 
     elif args.command == 'demo':
         demo()
+
+    elif args.command == 'web':
+        import sys
+        if sys.stdout.encoding and sys.stdout.encoding.upper() == 'GBK':
+            sys.stdout.reconfigure(encoding='utf-8')
+        print("正在启动 Web UI...")
+        from web_app import app
+        print("\n" + "=" * 50)
+        print("Penguin Genius - Web UI 已启动")
+        print("请访问: http://localhost:5000")
+        print("=" * 50)
+        app.run(host='127.0.0.1', port=5000, debug=False)
 
 
 if __name__ == "__main__":

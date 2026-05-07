@@ -1,0 +1,27 @@
+{
+  "apis": {
+    "tushare": {
+      "name": "Tushare Pro",
+      "token": "",
+      "enabled": false,
+      "description": "tushare.pro 数据接口，提供全面的 A 股财务数据"
+    },
+    "openai": {
+      "name": "OpenAI (Claude API)",
+      "key": "",
+      "enabled": false,
+      "description": "用于智能分析报告生成"
+    },
+    "deepseek": {
+      "name": "DeepSeek API",
+      "key": "",
+      "enabled": false,
+      "description": "DeepSeek 大模型 API，用于智能分析报告生成"
+    }
+  },
+  "settings": {
+    "data_source": "akshare",
+    "language": "zh-CN",
+    "theme": "dark"
+  }
+}

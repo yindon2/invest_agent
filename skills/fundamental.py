@@ -133,32 +133,71 @@ class FundamentalAnalysisSkill:
 
     def _dupont_analysis(self, symbol: str) -> Dict:
         """执行杜邦分析"""
+        data_source = '未知'
+
         try:
-            # 尝试从利润表获取数据
             income_df = self.fetcher.get_income_statement(symbol)
             balance_df = self.fetcher.get_balance_sheet(symbol)
 
             if income_df is not None and not income_df.empty and \
                balance_df is not None and not balance_df.empty:
 
-                # 提取最新报告期数据
                 income_latest = income_df.iloc[0] if len(income_df) > 0 else {}
                 balance_latest = balance_df.iloc[0] if len(balance_df) > 0 else {}
 
-                # 提取关键财务数据
+                # Check data source from _data_source column
+                for col in (income_latest.index if hasattr(income_latest, 'index') else []):
+                    if '_data_source' in str(col):
+                        val = income_latest[col]
+                        if isinstance(val, str):
+                            data_source = val
+                        break
+                if data_source == '未知':
+                    for col in (balance_latest.index if hasattr(balance_latest, 'index') else []):
+                        if '_data_source' in str(col):
+                            val = balance_latest[col]
+                            if isinstance(val, str):
+                                data_source = val
+                            break
+
                 net_income = self._extract_value(income_latest, ['净利润', '归属于母公司所有者的净利润'])
                 revenue = self._extract_value(income_latest, ['营业收入', '营业总收入'])
                 total_assets = self._extract_value(balance_latest, ['资产总计', '总资产'])
                 equity = self._extract_value(balance_latest, ['所有者权益合计', '股东权益合计', '净资产'])
 
                 if all(v is not None and v > 0 for v in [net_income, revenue, total_assets, equity]):
-                    return DupontAnalysis.analyze(net_income, revenue, total_assets, equity)
+                    result = DupontAnalysis.analyze(net_income, revenue, total_assets, equity)
+                    result['数据来源'] = data_source
+                    return result
 
         except Exception as e:
             print(f"  杜邦分析警告: {e}")
 
-        # 返回模拟示例数据
-        return self._demo_dupont_analysis()
+        # 最后备选：从财务指标推算
+        fin_data = self._get_financial_data(symbol)
+        core = fin_data.get('核心指标', {})
+        roe_est = core.get('净资产收益率ROE')
+        net_m_est = core.get('净利率')
+        if roe_est and net_m_est:
+            est_equity_multiplier = 1.8
+            est_turnover = roe_est / (net_m_est * est_equity_multiplier) if net_m_est > 0 else 0.8
+            return {
+                'ROE': roe_est,
+                '净利率': net_m_est,
+                '资产周转率': round(est_turnover, 2),
+                '权益乘数': est_equity_multiplier,
+                'ROA': round(roe_est / est_equity_multiplier, 2),
+                '数据来源': '财务指标推算',
+            }
+
+        return {
+            'ROE': None,
+            '净利率': None,
+            '资产周转率': None,
+            '权益乘数': None,
+            '数据来源': '无数据',
+            '说明': '无法获取足够的财务数据来计算杜邦分析'
+        }
 
     def _extract_value(self, series, keys: List[str]) -> Optional[float]:
         """从Series中提取数值"""
@@ -240,10 +279,22 @@ class FundamentalAnalysisSkill:
                          financial_data: Dict, dupont: Dict,
                          health: Dict) -> str:
         """生成Markdown格式的分析报告"""
+
+        def fmt(val, suffix='', na='N/A'):
+            if val is None:
+                return na
+            try:
+                return f"{float(val):.2f}{suffix}"
+            except:
+                return na
+
+        data_src = stock_info.get('_data_source', dupont.get('数据来源', '未知'))
+        src_tag = f'\n> 数据源: {data_src}' if data_src != '未知' else ''
+
         report = f"""
 # {stock_info.get('名称', symbol)} ({symbol}) 基本面分析报告
 
-> 分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+> 分析时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{src_tag}
 
 ## 一、公司概况
 
@@ -252,38 +303,51 @@ class FundamentalAnalysisSkill:
 | 股票代码 | {symbol} |
 | 股票名称 | {stock_info.get('名称', 'N/A')} |
 | 最新价 | {stock_info.get('最新价', 'N/A')} |
-| 涨跌幅 | {stock_info.get('涨跌幅', 'N/A')}% |
-| 市盈率(动态) | {stock_info.get('市盈率', 'N/A')} |
-| 市净率 | {stock_info.get('市净率', 'N/A')} |
+| 涨跌幅 | {fmt(stock_info.get('涨跌幅'), '%')} |
+| 市盈率(动态) | {fmt(stock_info.get('市盈率'))} |
+| 市净率 | {fmt(stock_info.get('市净率'))} |
+"""
 
+        roe = dupont.get('ROE')
+        net_m = dupont.get('净利率')
+        turnover = dupont.get('资产周转率')
+        equity_m = dupont.get('权益乘数')
+        dupont_src = dupont.get('数据来源', '')
+
+        if roe is not None:
+            report += f"""
 ## 二、杜邦分析
 
 杜邦分析将ROE分解为三个核心因素，揭示盈利能力的来源：
 
 | 指标 | 数值 | 解读 |
 |------|------|------|
-| **ROE** | {dupont.get('ROE', 'N/A'):.2f}% | {interpret_roe(dupont.get('ROE', 0))} |
-| 净利率 | {dupont.get('净利率', 'N/A'):.2f}% | 反映产品盈利能力 |
-| 资产周转率 | {dupont.get('资产周转率', 'N/A'):.2f}次 | 反映资产运营效率 |
-| 权益乘数 | {dupont.get('权益乘数', 'N/A'):.2f} | 反映财务杠杆水平 |
+| **ROE** | {fmt(roe, '%')} | {interpret_roe(roe)} |
+| 净利率 | {fmt(net_m, '%')} | 产品盈利能力 |
+| 资产周转率 | {fmt(turnover)} | 资产运营效率 |
+| 权益乘数 | {fmt(equity_m)} | 财务杠杆水平 |
+"""
+            if dupont_src and '估算' in dupont_src:
+                report += f'\n> [i] 杜邦分析基于{dupont_src}，如需精确数据请配置Tushare Token\n'
+        else:
+            report += '\n## 二、杜邦分析\n\n> ❌ 无法获取足够的财务数据进行杜邦分析。请配置Tushare Token以获取完整数据。\n'
 
-**杜邦分解公式**: ROE = 净利率 × 资产周转率 × 权益乘数
+        z_value = health.get('Z值', None)
+        z_level = health.get('风险等级', '')
 
-## 三、财务健康评估
-
-### Altman Z-Score 破产预警模型
-
-| 指标 | 数值 |
+        report += '\n## 三、财务健康评估\n\n### Altman Z-Score 破产预警模型\n\n'
+        if isinstance(z_value, (int, float)):
+            report += f"""| 指标 | 数值 |
 |------|------|
-| Z值 | {health.get('Z值', 'N/A')} |
-| 风险等级 | **{health.get('风险等级', 'N/A')}** |
+| Z值 | {z_value:.2f} |
+| 风险等级 | **{z_level}** |
 
 > Z值判断标准: Z>2.99(安全) | 1.81<Z<2.99(灰色) | Z<1.81(危险)
-
-## 四、投资建议
-
-### 估值分析
 """
+        else:
+            report += '> ❌ 数据不足，无法计算Altman Z-Score。\n'
+
+        report += '\n## 四、投资建议\n\n### 估值分析\n'
 
         # 估值解读
         pe = stock_info.get('市盈率')

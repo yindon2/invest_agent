@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>企鹅奇才 · AI 投资分析</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Microsoft YaHei','PingFang SC',-apple-system,sans-serif;background:#0d1117;color:#e6edf3;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#3fb950;--danger:#f85149;--warn:#d29922;--msg-user:#1f6feb;--msg-agent:#161b22}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0}
+.header .logo{font-size:20px;font-weight:700;color:#fff}
+.header .logo em{font-style:normal;color:var(--accent)}
+.header .status{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.header .status .dot{width:8px;height:8px;border-radius:50%;background:var(--accent2);display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* Profile selector */
+.profile-bar{display:flex;align-items:center;gap:8px;padding:8px 24px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;overflow-x:auto}
+.profile-bar label{font-size:12px;color:var(--text2);white-space:nowrap}
+.profile-btn{padding:4px 12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;white-space:nowrap;transition:all .2s;font-family:inherit}
+.profile-btn:hover{border-color:var(--accent);color:var(--accent)}
+.profile-btn.active{background:rgba(88,166,255,0.1);border-color:var(--accent);color:var(--accent)}
+
+/* Chat */
+.chat-area{flex:1;overflow-y:auto;padding:16px 24px;scroll-behavior:smooth}
+.chat-area::-webkit-scrollbar{width:6px}
+.chat-area::-webkit-scrollbar-track{background:transparent}
+.chat-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.msg{display:flex;margin-bottom:16px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg-user{justify-content:flex-end}
+.msg-agent{justify-content:flex-start}
+
+.msg-bubble{max-width:78%;padding:14px 18px;border-radius:12px;line-height:1.7;font-size:14px;position:relative}
+.msg-user .msg-bubble{background:var(--msg-user);border-bottom-right-radius:4px;color:#fff}
+.msg-agent .msg-bubble{background:var(--msg-agent);border:1px solid var(--border);border-bottom-left-radius:4px}
+
+.msg-time{font-size:10px;color:var(--text2);margin-top:6px;opacity:0.6}
+.msg-user .msg-time{text-align:right}
+
+/* Markdown styling */
+.msg-bubble h2{font-size:17px;margin:12px 0 8px;color:#fff;border-bottom:1px solid var(--border);padding-bottom:6px}
+.msg-bubble h3{font-size:15px;margin:10px 0 6px;color:#f0f6fc}
+.msg-bubble p{margin:6px 0}
+.msg-bubble table{border-collapse:collapse;margin:8px 0;width:100%;font-size:13px}
+.msg-bubble th,.msg-bubble td{padding:6px 10px;border:1px solid var(--border);text-align:left}
+.msg-bubble th{background:rgba(88,166,255,0.08);color:var(--accent);font-weight:600}
+.msg-bubble td{color:var(--text)}
+.msg-bubble code{background:rgba(255,255,255,0.06);padding:1px 6px;border-radius:4px;font-size:13px;font-family:'Consolas','Courier New',monospace;color:#ffa657}
+.msg-bubble pre{background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;overflow-x:auto;margin:8px 0;border:1px solid var(--border)}
+.msg-bubble pre code{background:transparent;padding:0;font-size:12px}
+.msg-bubble img{max-width:100%;border-radius:8px;margin:8px 0;border:1px solid var(--border)}
+.msg-bubble ul,.msg-bubble ol{padding-left:20px;margin:6px 0}
+.msg-bubble li{margin:3px 0}
+.msg-bubble blockquote{border-left:3px solid var(--accent);padding:6px 12px;margin:8px 0;background:rgba(88,166,255,0.04);border-radius:0 4px 4px 0;color:var(--text2)}
+.msg-bubble a{color:var(--accent);text-decoration:none;cursor:pointer}
+.msg-bubble a:hover{text-decoration:underline}
+.msg-bubble hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+.msg-bubble strong{color:#fff}
+
+.rating-badge{display:inline-block;padding:3px 12px;border-radius:12px;color:#fff;font-size:13px;font-weight:700;margin:4px 0}
+.z-score{font-size:22px;font-weight:700;margin:6px 0}
+
+/* Typing indicator */
+.typing{display:flex;align-items:center;gap:4px;padding:12px 18px}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--text2);animation:bounce 1.4s infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-4px)}}
+
+/* Suggested chips */
+.suggestions{display:flex;gap:8px;flex-wrap:wrap;padding:8px 24px;flex-shrink:0;background:var(--surface)}
+.suggestions .chip{padding:6px 14px;border-radius:16px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;transition:all .2s;font-family:inherit;white-space:nowrap}
+.suggestions .chip:hover{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,0.06)}
+
+/* Input */
+.input-area{display:flex;gap:8px;padding:12px 24px 16px;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0}
+.input-area input{flex:1;padding:10px 16px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;outline:none;transition:border .2s;font-family:inherit}
+.input-area input:focus{border-color:var(--accent)}
+.input-area input::placeholder{color:var(--text2)}
+.input-area button{padding:10px 20px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-size:14px;cursor:pointer;transition:opacity .2s;font-family:inherit;font-weight:600}
+.input-area button:hover{opacity:.85}
+.input-area button:disabled{opacity:.4;cursor:not-allowed}
+
+/* Mobile */
+@media(max-width:640px){
+  .header{padding:10px 16px}
+  .chat-area{padding:12px 16px}
+  .msg-bubble{max-width:90%;font-size:13px}
+  .input-area{padding:10px 16px}
+  .profile-bar{padding:6px 16px}
+  .suggestions{padding:6px 16px}
+}
+
+/* Empty state */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text2);text-align:center;padding:40px}
+.empty-state .icon{font-size:64px;margin-bottom:16px;opacity:.5}
+.empty-state h2{color:var(--text);font-size:24px;margin-bottom:8px}
+.empty-state p{font-size:14px;max-width:400px;line-height:1.8}
+.empty-state .examples{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px}
+.empty-state .examples button{padding:8px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--accent);cursor:pointer;font-size:13px;transition:all .2s;font-family:inherit}
+.empty-state .examples button:hover{background:rgba(88,166,255,0.08);border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">🐧 <em>企鹅奇才</em> · AI Agent</div>
+  <div class="status">
+    <span class="dot"></span>
+    <span>分析就绪</span>
+    <button onclick="resetChat()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;margin-left:8px;font-family:inherit">清除</button>
+    <button onclick="showSettings()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:11px;margin-left:4px;font-family:inherit">⚙️</button>
+  </div>
+</div>
+
+<div class="profile-bar" id="profileBar">
+  <label>🎯 风险人格:</label>
+  <button class="profile-btn" data-code="F1-E1-C1-T1">F1-E1-C1-T1 极度保守</button>
+  <button class="profile-btn active" data-code="F2-E2-C2-T2">F2-E2-C2-T2 保守型</button>
+  <button class="profile-btn" data-code="F3-E2-C3-T3">F3-E2-C3-T3 稳健型</button>
+  <button class="profile-btn" data-code="F4-E3-C4-T4">F4-E3-C4-T4 进取型</button>
+</div>
+
+<div class="chat-area" id="chatArea">
+  <div class="empty-state" id="emptyState">
+    <div class="icon">🐧</div>
+    <h2>企鹅奇才 · AI 投资分析</h2>
+    <p>输入股票代码或分析指令，获取专业的投资分析。<br>支持个股基本面、宏观经济、IRTI风险选股。</p>
+    <div class="examples">
+      <button onclick="sendMessage('分析600519')">📊 分析贵州茅台</button>
+      <button onclick="sendMessage('CPI与上证指数的关系')">📉 宏观分析</button>
+      <button onclick="sendMessage('推荐股票')">🎯 IRTI选股</button>
+      <button onclick="sendMessage('分析000001')">🏦 分析平安银行</button>
+    </div>
+  </div>
+</div>
+
+<div class="suggestions" id="suggestions"></div>
+
+<div class="input-area">
+  <input id="input" placeholder="输入股票代码或问题..." autofocus>
+  <button id="sendBtn">发送</button>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)hideSettings()">
+  <div style="background:var(--surface);border-radius:16px;padding:28px;max-width:560px;width:90%;max-height:85vh;overflow-y:auto;border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,0.5)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:20px;color:#fff">⚙️ API 配置</h2>
+      <button onclick="hideSettings()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;padding:4px 8px">&times;</button>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.6">
+      配置你的 API 密钥后，企鹅奇才将使用你的数据源进行分析。<br>
+      密钥仅保存在本地 <code>config.json</code> 文件中，不会上传到任何服务器。
+    </p>
+
+    <div id="apiList"></div>
+
+    <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <p style="color:var(--text2);font-size:12px;margin-bottom:8px">🔓 <strong>免费数据源</strong>（无需配置）</p>
+      <div style="background:rgba(63,185,80,0.06);border:1px solid rgba(63,185,80,0.15);border-radius:8px;padding:10px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><span style="color:var(--accent2);font-weight:600">AKShare</span> <span style="color:var(--text2);font-size:12px">— 开源免费 A 股数据</span></div>
+          <span style="color:var(--accent2);font-size:11px;background:rgba(63,185,80,0.1);padding:2px 8px;border-radius:8px">已就绪</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let sessionId = 's1';
+let isLoading = false;
+
+// ─── API 配置 ───
+
+function showSettings() {
+  document.getElementById('settingsModal').style.display = 'flex';
+  loadApiList();
+}
+
+function hideSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+async function loadApiList() {
+  const container = document.getElementById('apiList');
+  container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px">加载中...</div>';
+
+  try {
+    const [availResp, statusResp] = await Promise.all([
+      fetch('/api/config/available'),
+      fetch('/api/config')
+    ]);
+    const avail = (await availResp.json()).apis || [];
+    const status = (await statusResp.json()).apis || {};
+
+    container.innerHTML = avail.map(api => {
+      const st = status[api.id] || {configured: false, enabled: false, masked: ''};
+      return `
+        <div style="background:var(--bg);border-radius:10px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-size:16px;margin-right:6px">${api.icon}</span>
+              <strong style="color:#fff;font-size:14px">${api.name}</strong>
+              ${st.configured ? '<span style="color:var(--accent2);font-size:11px;margin-left:6px">✓ 已配置</span>' : '<span style="color:var(--warn);font-size:11px;margin-left:6px">未配置</span>'}
+            </div>
+            <a href="${api.doc_url}" target="_blank" style="color:var(--accent);font-size:11px;text-decoration:none">获取 →</a>
+          </div>
+          <p style="color:var(--text2);font-size:12px;margin:6px 0 10px">${api.description}</p>
+          ${api.howto ? `<p style="color:var(--text2);font-size:11px;background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:4px;margin-bottom:10px">📖 ${api.howto}</p>` : ''}
+          <div style="display:flex;gap:8px">
+            <input id="key_${api.id}" type="password" placeholder="${api.id === 'tushare' ? '输入 Token...' : '输入 API Key...'}" value="${st.configured ? '********' : ''}"
+              style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;outline:none;font-family:monospace">
+            <button onclick="saveApiKey('${api.id}')" style="padding:8px 14px;border-radius:6px;border:none;background:var(--accent);color:#fff;font-size:12px;cursor:pointer;font-family:inherit">保存</button>
+            <button onclick="testApiKey('${api.id}')" style="padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:12px;cursor:pointer;font-family:inherit">测试</button>
+            ${st.configured ? `<button onclick="deleteApiKey('${api.id}')" style="padding:8px 12px;border-radius:6px;border:1px solid var(--danger);background:transparent;color:var(--danger);font-size:12px;cursor:pointer;font-family:inherit">删除</button>` : ''}
+          </div>
+          <div id="result_${api.id}" style="margin-top:6px;font-size:12px"></div>
+        </div>
+      `;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div style="color:var(--danger);padding:10px">加载失败: ' + e.message + '</div>';
+  }
+}
+
+async function saveApiKey(id) {
+  const input = document.getElementById('key_' + id);
+  const token = input.value.trim();
+  const resultEl = document.getElementById('result_' + id);
+  if (!token || token === '********') {
+    resultEl.innerHTML = '<span style="color:var(--warn)">请输入新的 API Key/Token</span>';
+    return;
+  }
+  try {
+    const resp = await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name: id, token, enabled: true})
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      resultEl.innerHTML = '<span style="color:var(--accent2)">✓ ' + data.msg + '</span>';
+      setTimeout(() => loadApiList(), 1000);
+    } else {
+      resultEl.innerHTML = '<span style="color:var(--danger)">✗ ' + data.msg + '</span>';
+    }
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:var(--danger)">✗ 保存失败: ' + e.message + '</span>';
+  }
+}
+
+async function testApiKey(id) {
+  const resultEl = document.getElementById('result_' + id);
+  resultEl.innerHTML = '<span style="color:var(--text2)">测试中...</span>';
+  try {
+    const resp = await fetch('/api/config/test/' + id, {method: 'POST'});
+    const data = await resp.json();
+    resultEl.innerHTML = data.ok
+      ? '<span style="color:var(--accent2)">✓ ' + data.msg + '</span>'
+      : '<span style="color:var(--danger)">✗ ' + data.msg + '</span>';
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:var(--danger)">✗ 测试失败: ' + e.message + '</span>';
+  }
+}
+
+async function deleteApiKey(id) {
+  if (!confirm('确定删除 ' + id + ' 的配置？')) return;
+  try {
+    const resp = await fetch('/api/config/' + id, {method: 'DELETE'});
+    const data = await resp.json();
+    if (data.ok) {
+      loadApiList();
+    }
+  } catch(e) {}
+}
+
+// ─── 聊天 ───
+
+// Marked config
+marked.setOptions({
+  breaks: true,
+  gfm: true,
+});
+
+// Chat
+const chatArea = document.getElementById('chatArea');
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const emptyState = document.getElementById('emptyState');
+const suggestions = document.getElementById('suggestions');
+
+function addMessage(role, html, time) {
+  emptyState.style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'msg msg-' + role;
+  div.innerHTML = `<div class="msg-bubble">${html}<div class="msg-time">${time || ''}</div></div>`;
+  chatArea.appendChild(div);
+  chatArea.scrollTop = chatArea.scrollHeight;
+  return div;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'msg msg-agent';
+  div.id = 'typingIndicator';
+  div.innerHTML = '<div class="msg-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
+  chatArea.appendChild(div);
+  chatArea.scrollTop = chatArea.scrollHeight;
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+function renderMarkdown(text) {
+  // Handle clickable stock codes
+  text = text.replace(/\(stock:(\d{6})\)/g, (m, code) => `(javascript:sendMessage('${code}'))`);
+
+  // Convert inline markdown to HTML
+  let html = marked.parse(text);
+
+  // Make stock code links work
+  html = html.replace(/href="javascript:sendMessage\('(\d{6})'\)"/g, (m, code) =>
+    `onclick="sendMessage('${code}')" style="color:#58a6ff;cursor:pointer;text-decoration:underline;"`
+  );
+
+  return html;
+}
+
+async function sendMessage(text) {
+  if (isLoading) return;
+  if (!text) return;
+
+  const msg = text.trim();
+  input.value = '';
+  isLoading = true;
+  sendBtn.disabled = true;
+
+  // Get risk profile
+  const activeProfile = document.querySelector('.profile-btn.active');
+  const riskCode = activeProfile ? activeProfile.dataset.code : '';
+
+  addMessage('user', msg, new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}));
+  suggestions.innerHTML = '';
+  showTyping();
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, session_id: sessionId, risk_code: riskCode})
+    });
+    const data = await resp.json();
+    removeTyping();
+    const html = renderMarkdown(data.reply);
+    addMessage('assistant', html, new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}));
+
+    // Update suggestions from context
+    const conv = data.conv || {};
+    const ctx = conv.context || {};
+    const chips = [];
+    if (ctx.last_symbol) chips.push({text: '📊 ' + ctx.last_symbol + ' 分析', msg: ctx.last_symbol});
+    if (ctx.mentioned_stocks && ctx.mentioned_stocks.length > 1) {
+      for (const s of ctx.mentioned_stocks.slice(0, 3)) {
+        if (s !== ctx.last_symbol) chips.push({text: '📊 ' + s, msg: s});
+      }
+    }
+    chips.push({text: '📉 CPI宏观分析', msg: 'CPI与上证指数的关系'});
+    chips.push({text: '🎯 推荐股票', msg: '推荐股票'});
+
+    suggestions.innerHTML = chips.map(c =>
+      `<button class="chip" onclick="sendMessage('${c.msg}')">${c.text}</button>`
+    ).join('');
+
+  } catch(e) {
+    removeTyping();
+    addMessage('assistant', '❌ 网络错误，请检查服务是否运行。', '');
+  }
+
+  isLoading = false;
+  sendBtn.disabled = false;
+  input.focus();
+}
+
+async function resetChat() {
+  await fetch('/api/reset', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({session_id: sessionId})});
+  chatArea.querySelectorAll('.msg').forEach(el => el.remove());
+  emptyState.style.display = 'flex';
+  suggestions.innerHTML = '';
+}
+
+// Profile selection
+document.getElementById('profileBar').addEventListener('click', e => {
+  const btn = e.target.closest('.profile-btn');
+  if (!btn) return;
+  document.querySelectorAll('.profile-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+});
+
+// Input handlers
+sendBtn.addEventListener('click', () => sendMessage(input.value));
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage(input.value);
+  }
+});
+
+// Auto focus
+input.focus();
+</script>
+</body>
+</html>

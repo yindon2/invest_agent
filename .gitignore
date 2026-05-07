@@ -9,3 +9,4 @@ outputs/reports/*
 dist/
 build/
 config.json
+node_modules/

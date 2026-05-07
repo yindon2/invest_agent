@@ -631,8 +631,10 @@ def available_apis():
     })
 
 if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
     print("=" * 50)
     print("Penguin Genius - Web UI 启动")
-    print("http://localhost:5000")
+    print(f"http://0.0.0.0:{port}")
     print("=" * 50)
-    app.run(host='127.0.0.1', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=port, debug=debug)
